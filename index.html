@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ABIR ADS SYSTEM</title>
+
+  <!-- Monetag SDK (use your Zone ID below) -->
+  <script src="https://libtl.com/sdk.js" data-zone="10057244" data-sdk="show_10057244" async></script>
+
+  <style>
+    :root{
+      --bg:#0b0b12; --card:#141418; --muted:#9aa3b2; --accent:#2196f3; --accent2:#ff4081; --gold:#ffd700; --glass: rgba(255,255,255,0.03);
+    }
+    *{box-sizing:border-box;margin:0;padding:0;font-family:Inter,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+    html,body{height:100%}
+    body{
+      background: linear-gradient(135deg,var(--bg),#14121a);
+      color:#e9eef6;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:20px;
+    }
+
+    .wrap{
+      width:100%;
+      max-width:720px;
+      background:var(--card);
+      border-radius:12px;
+      box-shadow:0 12px 40px rgba(0,0,0,0.6);
+      overflow:hidden;
+      border:1px solid rgba(255,255,255,0.03);
+    }
+
+    header{
+      padding:18px 20px;
+      background:linear-gradient(90deg,var(--accent),var(--accent2));
+      color:#fff;
+    }
+    header h1{font-size:20px;letter-spacing:0.2px}
+    .content{padding:18px}
+
+    .row{
+      display:flex;
+      gap:12px;
+      align-items:center;
+      margin-bottom:12px;
+      flex-wrap:wrap;
+    }
+
+    .card{
+      background:var(--glass);
+      padding:12px;
+      border-radius:10px;
+      border:1px solid rgba(255,255,255,0.03);
+    }
+
+    .stat{
+      flex:1;
+      text-align:center;
+    }
+    .stat .label{font-size:13px;color:var(--muted);margin-bottom:6px}
+    .stat .val{font-weight:700;color:var(--accent);font-size:20px}
+
+    .progress-wrap{margin:12px 0}
+    .progress-label{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);margin-bottom:8px}
+    .progress-bar{height:10px;background:rgba(255,255,255,0.04);border-radius:8px;overflow:hidden}
+    .progress-fill{height:100%;width:0;transition:width .35s;background:linear-gradient(90deg,var(--accent),var(--accent2))}
+
+    .controls{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+    button{
+      background:linear-gradient(45deg,var(--accent),var(--accent2));
+      border:none;color:#fff;padding:10px 14px;border-radius:10px;font-weight:700;cursor:pointer;box-shadow:0 6px 0 rgba(0,0,0,0.4);
+    }
+    button.secondary{background:linear-gradient(45deg,#777,#555);box-shadow:0 6px 0 rgba(0,0,0,0.4)}
+    .note{font-size:13px;color:var(--muted);margin-top:10px;text-align:center}
+
+    /* banner area */
+    .banner-area{margin-top:14px;padding:12px;background:rgba(255,255,255,0.02);border-radius:10px;text-align:center}
+    .banner-slot{min-height:60px;display:flex;align-items:center;justify-content:center}
+
+    /* notification */
+    .notif{
+      position:fixed;left:50%;top:20px;transform:translateX(-50%);background:rgba(0,0,0,0.85);color:#fff;padding:10px 18px;border-radius:8px;display:none;z-index:9999;
+    }
+
+    @media (max-width:520px){
+      .row{flex-direction:column}
+    }
+  </style>
+</head>
+<body>
+  <div class="notif" id="notif"></div>
+
+  <div class="wrap" role="main">
+    <header>
+      <h1>ABIR ADS SYSTEM</h1>
+    </header>
+
+    <div class="content">
+      <div class="row">
+        <div class="card stat">
+          <div class="label">Watched Ads</div>
+          <div class="val" id="watched">0</div>
+        </div>
+        <div class="card stat">
+          <div class="label">Earned Points</div>
+          <div class="val" id="points">0</div>
+        </div>
+      </div>
+
+      <div class="progress-wrap">
+        <div class="progress-label">
+          <div>Progress to Bonus</div>
+          <div id="progress-text">0%</div>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" id="progress-fill"></div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <button id="watchBtn">▶ Watch Ad (+1)</button>
+        <button id="startAuto">▶ Start Auto Ads (150)</button>
+        <button id="stopAuto" class="secondary">⏹ Stop Auto Ads</button>
+      </div>
+
+      <div class="banner-area card" aria-hidden="false">
+        <div class="label" style="font-size:13px;color:var(--muted);margin-bottom:8px">Banner (mixed) — Monetag</div>
+        <div id="banner-slot" class="banner-slot"></div>
+      </div>
+
+      <div class="note">Mixed ads (Popup + Banner) — Monetag Zone ID: <strong>10057244</strong></div>
+    </div>
+  </div>
+
+  <script>
+    // Configuration
+    const ZONE_ID = "10057244";            // Monetag zone (already set in <script> tag)
+    const SDK_FN = "show_10057244";        // Monetag show function name (data-sdk)
+    const TOTAL_AUTO_ADS = 150;            // number of ads to run in auto mode
+    const AUTO_INTERVAL_MS = 30000;        // 30 seconds between auto ads
+    const POINTS_PER_AD = 1;
+    const ADS_FOR_BONUS = 20;
+    const BONUS_POINTS = 5;
+
+    // State
+    let watched = 0;
+    let points = 0;
+    let autoTimer = null;
+    let autoPlayed = 0;
+
+    // Elements
+    const watchedEl = document.getElementById('watched');
+    const pointsEl = document.getElementById('points');
+    const progressFillEl = document.getElementById('progress-fill');
+    const progressTextEl = document.getElementById('progress-text');
+    const notifEl = document.getElementById('notif');
+    const bannerSlot = document.getElementById('banner-slot');
+
+    // Initialize from localStorage
+    function init() {
+      watched = parseInt(localStorage.getItem('abir_watched') || "0", 10);
+      points = parseFloat(localStorage.getItem('abir_points') || "0");
+      updateUI();
+      bindButtons();
+      renderBanner(); // attempt to render banner immediately (SDK will handle)
+    }
+
+    function bindButtons(){
+      document.getElementById('watchBtn').addEventListener('click', onWatch);
+      document.getElementById('startAuto').addEventListener('click', startAutoAds);
+      document.getElementById('stopAuto').addEventListener('click', stopAutoAds);
+    }
+
+    function updateUI(){
+      watchedEl.textContent = watched;
+      pointsEl.textContent = Math.round(points);
+      const prog = (watched % ADS_FOR_BONUS) / ADS_FOR_BONUS * 100;
+      progressFillEl.style.width = prog + "%";
+      progressTextEl.textContent = Math.round(prog) + "%";
+    }
+
+    function showNotif(msg, ms = 2200){
+      notifEl.textContent = msg;
+      notifEl.style.display = "block";
+      setTimeout(()=>{ notifEl.style.display = "none"; }, ms);
+    }
+
+    // Monetag ad wrapper — returns a promise that resolves when ad finished
+    function showMonetagAd(){
+      return new Promise((resolve, reject) => {
+        try {
+          const fn = window[SDK_FN];
+          if (typeof fn === "function") {
+            const res = fn();
+            if (res && typeof res.then === "function") {
+              res.then(resolve).catch(reject);
+            } else {
+              // SDK didn't return promise — assume it shows and call resolve after a timeout fallback
+              setTimeout(resolve, 3500);
+            }
+          } else {
+            reject(new Error("Monetag SDK function not found"));
+          }
+        } catch (e) {
+          reject(e);
+        }
+      });
+    }
+
+    async function onWatch(){
+      showNotif("Loading ad...");
+      try {
+        await showMonetagAd();
+        grant();
+        showNotif("Ad completed — +1 point");
+      } catch (err){
+        // fallback simulated ad (if SDK fails)
+        console.warn("Monetag failed:", err);
+        showNotif("Monetag failed, playing simulated ad...");
+        setTimeout(()=>{ grant(); showNotif("Simulated ad done — +1 point"); }, 2000);
+      }
+    }
+
+    function grant(){
+      watched += 1;
+      points += POINTS_PER_AD;
+      if (watched % ADS_FOR_BONUS === 0) {
+        points += BONUS_POINTS;
+        showNotif("🎉 Bonus awarded: +" + BONUS_POINTS + " points", 3000);
+      }
+      localStorage.setItem('abir_watched', watched);
+      localStorage.setItem('abir_points', points);
+      updateUI();
+    }
+
+    function startAutoAds(){
+      if (autoTimer) { showNotif("Auto ads already running"); return; }
+      autoPlayed = 0;
+      showNotif("Auto ads started — will play up to " + TOTAL_AUTO_ADS + " ads");
+      autoTimer = setInterval(async () => {
+        if (autoPlayed >= TOTAL_AUTO_ADS) {
+          stopAutoAds();
+          showNotif("✅ Auto ads completed (" + TOTAL_AUTO_ADS + ")");
+          return;
+        }
+        autoPlayed++;
+        try {
+          await showMonetagAd();
+          grant();
+        } catch (e) {
+          // if monetag fails, still simulate to keep auto flow
+          grant();
+        }
+      }, AUTO_INTERVAL_MS);
+
+      // Start first ad immediately
+      (async () => {
+        autoPlayed++;
+        try { await showMonetagAd(); grant(); } catch (e) { grant(); }
+      })();
+    }
+
+    function stopAutoAds(){
+      if (!autoTimer) { showNotif("Auto ads not running"); return; }
+      clearInterval(autoTimer);
+      autoTimer = null;
+      showNotif("Auto ads stopped");
+    }
+
+    // Try to render a banner placeholder using Monetag SDK conventions (SDK will ignore if unsupported)
+    function renderBanner(){
+      // If SDK provides a way to render banner by zone & container, it will pick this up.
+      // We place a simple placeholder div and a small script tag that suggests the container id to the SDK.
+      bannerSlot.innerHTML = '';
+      const placeholder = document.createElement('div');
+      placeholder.id = 'monetag-banner-' + ZONE_ID;
+      placeholder.style.width = '100%';
+      placeholder.style.minHeight = '60px';
+      placeholder.style.display = 'flex';
+      placeholder.style.alignItems = 'center';
+      placeholder.style.justifyContent = 'center';
+      placeholder.style.color = '#cdd7e3';
+      placeholder.style.fontSize = '14px';
+      placeholder.textContent = 'Loading banner...';
+      bannerSlot.appendChild(placeholder);
+
+      // Some Monetag integrations auto-scan for data-zone attributes; we add one as fallback.
+      const ins = document.createElement('ins');
+      ins.setAttribute('data-zone', ZONE_ID);
+      ins.style.display = 'block';
+      ins.style.width = '100%';
+      ins.style.minHeight = '60px';
+      placeholder.appendChild(ins);
+    }
+
+    // Start
+    window.addEventListener('load', init);
+  </script>
+</body>
+</html>
